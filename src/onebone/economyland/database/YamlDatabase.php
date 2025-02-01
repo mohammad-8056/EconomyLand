@@ -21,7 +21,7 @@
 namespace onebone\economyland\database;
 
 use onebone\economyland\event\LandRemoveEvent;
-use pocketmine\level\Level;
+use pocketmine\world\World as Level;
 use pocketmine\Server;
 use pocketmine\utils\Config;
 use pocketmine\player\Player;
@@ -34,7 +34,7 @@ class YamlDatabase implements Database{
 	 */
 	private $land, $config;
 	private $path;
-	private $landNum = 0;
+	private mixed $landNum = 0;
 
 
 	public function __construct($fileName, $config, $otherName){

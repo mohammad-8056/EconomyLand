@@ -20,7 +20,7 @@
 
 namespace onebone\economyland\database;
 
-use pocketmine\level\Level;
+use pocketmine\world\World as Level;
 use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\Config;

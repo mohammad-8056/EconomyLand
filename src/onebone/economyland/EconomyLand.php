@@ -38,7 +38,7 @@ use pocketmine\world\Position;
 use pocketmine\world\World as Level;
 use pocketmine\event\EventPriority;
 
-use cooldogopmdev\BedrockEconomy\BedrockEconomy;
+use onebone\economyapi\EconomyAPI;
 use onebone\economyland\database\YamlDatabase;
 use onebone\economyland\database\SQLiteDatabase;
 use onebone\economyland\database\Database;
@@ -50,11 +50,11 @@ class EconomyLand extends PluginBase implements Listener
     /**
      * @var Database;
      */
-    private $db;
+    private Database $db;
     /**
      * @var Config
      */
-    private $lang;
+    private Config $lang;
     private $start, $end;
     private $expire;
 
@@ -315,11 +315,9 @@ class EconomyLand extends PluginBase implements Listener
                             $player = $sender->getName();
                             $alike = false;
                         }
-                        if ($alike) {
-                            $lands = $this->db->getLandsByKeyword($player);
-                        } else {
-                            $lands = $this->db->getLandsByOwner($player);
-                        }
+
+                        $lands = $this->db->getLandsByOwner($player);
+
                         $sender->sendMessage("Results from query : $player\n");
                         foreach ($lands as $info)
                             $sender->sendMessage($this->getMessage("land-list-format", array($info["ID"], ($info["endX"] - $info["startX"]) * ($info["endZ"] - $info["startZ"]), $info["owner"])));
@@ -438,7 +436,7 @@ class EconomyLand extends PluginBase implements Listener
                         $landnum = array_shift($param);
                         $player = array_shift($param);
                         if (trim($player) == "" or trim($landnum) == "") {
-                            $sender->sendMessage("Usage : /land <invite> <land number> <[r:]player>");
+                            $sender->sendMessage("Usage : /land invite <land number> <[r:]player>");
                             return true;
                         }
                         if (!is_numeric($landnum)) {
@@ -583,14 +581,14 @@ class EconomyLand extends PluginBase implements Listener
         return false;
     }
 
-    public function onPlayerInteract(PlayerInteractEvent $event)
+    public function onPlayerInteract(PlayerInteractEvent $event): void
     {
         if ($event->getAction() === PlayerInteractEvent::RIGHT_CLICK_BLOCK) {
             $this->permissionCheck($event);
         }
     }
 
-    public function onPlaceEvent(BlockPlaceEvent $event)
+    public function onPlaceEvent(BlockPlaceEvent $event): void
     {
         $name = $event->getPlayer()->getName();
         if (isset($this->placeQueue[$name])) {
@@ -599,14 +597,13 @@ class EconomyLand extends PluginBase implements Listener
         }
     }
 
-    public function onBreakEvent(BlockBreakEvent $event)
+    public function onBreakEvent(BlockBreakEvent $event): void
     {
         $this->permissionCheck($event);
     }
 
-    public function permissionCheck(Event $event)
+    public function permissionCheck(PlayerInteractEvent|BlockBreakEvent $event): bool
     {
-        /** @var $player Player */
         $player = $event->getPlayer();
         if ($event instanceof PlayerInteractEvent) {
             $block = $event->getBlock()->getSide($event->getFace());
