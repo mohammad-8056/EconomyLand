@@ -20,15 +20,14 @@
 
 namespace onebone\economyland\database;
 
+use onebone\economyland\event\LandAddedEvent;
+use onebone\economyland\event\LandRemoveEvent;
 use pocketmine\world\World as Level;
 use pocketmine\player\Player;
 use pocketmine\Server;
 use pocketmine\utils\Config;
 
 class SQLiteDatabase implements Database {
-    /**
-     * @var array
-     */
     private $land, $config;
     private $path;
 
@@ -38,17 +37,17 @@ class SQLiteDatabase implements Database {
         $this->path = $fileName;
         $this->land = new \SQLite3($fileName);
         $this->land->exec("CREATE TABLE IF NOT EXISTS land(
-			ID INTEGER PRIMARY KEY AUTOINCREMENT,
-			startX INTEGER NOT NULL,
-			startZ INTEGER NOT NULL,
-			endX INTEGER NOT NULL,
-			endZ INTEGER NOT NULL,
-			level TEXT NOT NULL,
-			owner TEXT NOT NULL,
-			invitee TEXT NOT NULL,
-			price INTEGER NOT NULL,
-			expires INTEGER
-		)");
+            ID INTEGER PRIMARY KEY AUTOINCREMENT,
+            startX INTEGER NOT NULL,
+            startZ INTEGER NOT NULL,
+            endX INTEGER NOT NULL,
+            endZ INTEGER NOT NULL,
+            level TEXT NOT NULL,
+            owner TEXT NOT NULL,
+            invitee TEXT NOT NULL,
+            price INTEGER NOT NULL,
+            expires INTEGER
+        )");
 
         $this->config = $config;
     }
@@ -72,37 +71,51 @@ class SQLiteDatabase implements Database {
     }
 
     public function getLandById($id) {
-        return $this->land->query("SELECT * FROM land WHERE ID = $id")->fetchArray(SQLITE3_ASSOC);
+        $stmt = $this->land->prepare("SELECT * FROM land WHERE ID = :id");
+        $stmt->bindValue(':id', $id, SQLITE3_INTEGER);
+        $result = $stmt->execute();
+        return $result->fetchArray(SQLITE3_ASSOC);
     }
 
+
     public function getLandsByOwner($owner) {
-        $result = $this->land->query("SELECT * FROM land WHERE owner = '$owner'");
+        $stmt = $this->land->prepare("SELECT * FROM land WHERE owner = :owner");
+        $stmt->bindValue(":owner", $owner, SQLITE3_TEXT);
+        $result = $stmt->execute();
         $ret = [];
-        while (($result->fetchArray(SQLITE3_ASSOC)) !== false) {
-            $ret[] = $result->fetchArray(SQLITE3_ASSOC);
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $ret[] = $row;
         }
         return $ret;
     }
 
     public function getLandsByKeyword($keyword) {
-        $result = $this->land->query("SELECT * FROM land WHERE owner LIKE '%$keyword%'");
+        $stmt = $this->land->prepare("SELECT * FROM land WHERE owner LIKE :keyword");
+        $stmt->bindValue(":keyword", "%$keyword%", SQLITE3_TEXT);
+        $result = $stmt->execute();
         $ret = [];
-        while (($result->fetchArray(SQLITE3_ASSOC)) != false) {
-            $ret[] = $result->fetchArray(SQLITE3_ASSOC);
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            $ret[] = $row;
         }
         return $ret;
     }
 
     public function getInviteeById($id) {
-        $invitee = $this->land->exec("SELECT invitee FROM land WHERE ID = $id")->fetchArray(SQLITE3_ASSOC)["invitee"];
-        return unserialize($invitee);
+        $stmt = $this->land->prepare("SELECT invitee FROM land WHERE ID = :id");
+        $stmt->bindValue(":id", $id, SQLITE3_INTEGER);
+        $result = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
+        return $result ? explode(self::INVITEE_SEPERATOR, $result["invitee"]) : [];
     }
 
     public function addInviteeById($id, $name) {
         $invitee = $this->getInviteeById($id);
+        $name = strtolower(str_replace("'", "", $name));
         if (!in_array($name, $invitee)) {
-            $invitee[] = strtolower(str_replace("'", "", $name));
-            $this->land->exec("UPDATE land SET invitee = '" . serialize($invitee) . "' WHERE ID = $id");
+            $invitee[] = $name;
+            $stmt = $this->land->prepare("UPDATE land SET invitee = :invitee WHERE ID = :id");
+            $stmt->bindValue(":invitee", implode(self::INVITEE_SEPERATOR, $invitee), SQLITE3_TEXT);
+            $stmt->bindValue(":id", $id, SQLITE3_INTEGER);
+            $stmt->execute();
             return true;
         }
         return false;
@@ -133,8 +146,26 @@ class SQLiteDatabase implements Database {
             $level = $level->getFolderName();
         }
 
-        $this->land->exec("INSERT INTO land (startX, endX, startZ, endZ, owner, level, price, invitee" . ($expires === null ? "" : ", expires") . ") VALUES ($startX, $endX, $startZ, $endZ, '$owner', '$level', $price, '{}'" . ($expires === null ? "" : ", $expires") . ")");
-        return $this->land->query("SELECT seq FROM sqlite_sequence")->fetchArray(SQLITE3_ASSOC)["seq"] - 1;
+        $stmt = $this->land->prepare("INSERT INTO land (startX, endX, startZ, endZ, owner, level, price, invitee" . ($expires === null ? "" : ", expires") . ") VALUES (:startX, :endX, :startZ, :endZ, :owner, :level, :price, :invitee" . ($expires === null ? "" : ", :expires") . ")");
+        $stmt->bindValue(":startX", $startX, SQLITE3_INTEGER);
+        $stmt->bindValue(":endX", $endX, SQLITE3_INTEGER);
+        $stmt->bindValue(":startZ", $startZ, SQLITE3_INTEGER);
+        $stmt->bindValue(":endZ", $endZ, SQLITE3_INTEGER);
+        $stmt->bindValue(":owner", $owner, SQLITE3_TEXT);
+        $stmt->bindValue(":level", $level, SQLITE3_TEXT);
+        $stmt->bindValue(":price", $price, SQLITE3_INTEGER);
+        $stmt->bindValue(":invitee", implode(self::INVITEE_SEPERATOR, $invitee), SQLITE3_TEXT);
+        if ($expires !== null) {
+            $stmt->bindValue(":expires", $expires, SQLITE3_INTEGER);
+        }
+        $stmt->execute();
+
+        $id = $this->land->lastInsertRowID();
+
+        $ev = new LandAddedEvent($id, $startX, $endX, $startZ, $endZ, $level, $price, $owner, $expires);
+        $ev->call();
+
+        return $id;
     }
 
     public function setOwnerById($id, $owner) {
@@ -142,7 +173,11 @@ class SQLiteDatabase implements Database {
     }
 
     public function removeLandById($id) {
-        $this->land->exec("DELETE FROM land WHERE ID = $id");
+        $ev = new LandRemoveEvent($id);
+        $ev->call();
+        if(!$ev->isCancelled()) {
+            $this->land->exec("DELETE FROM land WHERE ID = $id");
+        }
     }
 
     public function canTouch($x, $z, $level, Player $player) {
