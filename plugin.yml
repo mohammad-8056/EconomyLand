@@ -8,6 +8,10 @@ authors:
 
 softdepend:
   - EconomyAPI
+  - BedrockEconomy
+  - XP
+  - EssentialsX
+  - EXP
 
 permissions:
   economyland.*:
