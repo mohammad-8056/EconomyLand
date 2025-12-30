@@ -93,6 +93,7 @@ class EconomyLand extends PluginBase implements Listener
 
         libPiggyEconomy::init();
         $economyConfig = $this->getConfig()->get('economy');
+        
         if (!$economyConfig) $economyConfig = ["provider" => "economyapi"];
 
         try {
