@@ -93,7 +93,7 @@ class EconomyLand extends PluginBase implements Listener
 
         libPiggyEconomy::init();
         $economyConfig = $this->getConfig()->get('economy');
-        
+
         if (!$economyConfig) $economyConfig = ["provider" => "economyapi"];
 
         try {
@@ -283,7 +283,7 @@ class EconomyLand extends PluginBase implements Listener
                         }
                         $price = ((($endX + 1) - ($startX - 1)) - 1) * ((($endZ + 1) - ($startZ - 1)) - 1) * $this->getConfig()->get("price-per-y-axis", 100);
                         $economyProvider = $this->economyProvider;
-                        $this->economyProvider->getMoney($sender, function (float $currentMoney) use ($sender, $economyProvider, $price, $startX, $startZ, $endX, $endZ) : void {
+                        $this->economyProvider->getMoney($sender, function (float|int $currentMoney) use ($sender, $economyProvider, $price, $startX, $startZ, $endX, $endZ) : void {
                             if ($currentMoney < $price) {
                                 //$difference = $price - $currentMoney;
                                 $sender->sendMessage($this->getMessage("no-money-to-buy-land"));
