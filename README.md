@@ -46,6 +46,7 @@ This plugin is based on [EconomyS](https://github.com/onebone/EconomyS). You can
 - Updated for **PocketMine API 5**
 - Improved land protection system
 - Optimized performance and bug fixes
+- Support for other economy plugins. Can be configured in config.yml
 
 ## 🤝 Contribution
 Feel free to contribute by opening issues or pull requests on GitHub.
