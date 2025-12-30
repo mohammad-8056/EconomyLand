@@ -1,3 +1,7 @@
+# Economy settings.
+# Possible providers: economyapi, bedrockeconomy, xp, essentialsx, exp
+economy:
+  provider: economyapi
 # Whether to allow players to overlap their lands if it is owned by same player
 allow-overlap: false
 # Worlds to protect by default. Players will have to buy land in order to modify the terrain.
